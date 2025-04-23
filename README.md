@@ -1,3 +1,8 @@
-# CUDA Input/Output Control
+# GPU
 
-The goal of this is to explore CUDA and the Nvidia GPU in general. 
+
+Make sure `opencl` is installed
+```
+# Build and run on a system with a GPU
+bash build.sh
+```
