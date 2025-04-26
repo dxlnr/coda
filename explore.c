@@ -1,10 +1,31 @@
-
 /*
- * dims = G*L (global_id = g*num_threads + l)
+ * (OpenCL) dims = G*L (global_id = g*num_threads + l)
  *
  *            OpenCL        CUDA       HIP                  METAL
  * G cores   (get_group_id, blockIdx,  __ockl_get_group_id, threadgroup_position_in_grid)
  * L threads (get_local_id, threadIdx, __ockl_get_local_id, thread_position_in_threadgroup)
+ *
+ *            NVIDIA                          AMD
+ * cores      SM (streaming multiprocessors)  CU (compute units)
+ *
+ * GPU have warps which are grouped threads (32 each)
+ *
+ * SIMT (Single Instruction multiple threads) 
+ *   - similar to SIMD but its not declared explicitly (float* instead of float<32>) as in SIMD
+ *     this is important as in 
+ *       `int i = get_local_id(0);`
+ *     the register for i is a vectorial
+ *
+ *   - load/stores on the GPU are different compared to SIMD
+ *    they are implicit scatter gather, where as on SIMD it is explicit
+ *       meaning the GPU is moving or organizing data between different locations (scatter) and collecting it back together (gather) but without the user explicitly managing it 
+ *       
+ *       `Memory coalescing` is how GPUs achieve an efficient form of implicit scatter-gather
+ *
+ * ----------------------------------------------------------------------------
+ * NVIDIA AD102
+ * 144 SMs with 128 threads each -> 144 * 128 = 18432 CUDA cores (threads)
+ *
  *
 **/
 
@@ -16,21 +37,21 @@
 
 const char* clkernel = 
 "__kernel void explore(__global float* C) { \n"
-"                                       \n"
-"    int i = get_local_id(0);           \n"
-"    C[get_global_id(0)] = i;           \n"
-"}                                      \n";
+"                                           \n"
+"    int i = get_local_id(0);               \n"
+"    C[get_global_id(0)] = i;               \n"
+"}                                          \n";
 
 int main() {
   float *C = (float*)malloc(sizeof(float) * SIZE);
-  //
+  // INITIATE COMPUTE SYSTEM
   cl_int err;
   cl_platform_id platform;
   cl_device_id device;
   clGetPlatformIDs(1, &platform, NULL);
   clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-  //
   cl_context context = clCreateContext(NULL, 1, &device, NULL, NULL, NULL);
+  // 
   cl_queue_properties props[] = {
     CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE,
     0
@@ -47,7 +68,7 @@ int main() {
   clSetKernelArg(kernel, 0, sizeof(cl_mem), &bufC);
   // KERNEL EXECUTION
   size_t globalSize = 128;
-  size_t localSize  = 4;
+  size_t localSize  = 32;
   /*
    * clEnqueueNDRangeKernel
    * ----------------------
