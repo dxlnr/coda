@@ -9,6 +9,7 @@
  * cores      SM (streaming multiprocessors)  CU (compute units)
  *
  * GPU have warps which are grouped threads (32 each)
+ * GPU are multicore processors with 32 threads
  *
  * SIMT (Single Instruction multiple threads) 
  *   - similar to SIMD but its not declared explicitly (float* instead of float<32>) as in SIMD
