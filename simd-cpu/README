@@ -1,0 +1,2 @@
+clang -O3 -march=native base.c -o base
+clang -O3 -mavx2 -mfma -march=native simd.c -o simd
