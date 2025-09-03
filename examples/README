@@ -1,0 +1,2 @@
+clang base.c -lOpenCL -o base
+clang perf.c -lOpenCL -o perf

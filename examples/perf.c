@@ -1,36 +1,3 @@
-/*
- * (OpenCL) dims = G*L (global_id = g*num_threads + l)
- *
- *            OpenCL        CUDA       HIP                  METAL
- * G cores   (get_group_id, blockIdx,  __ockl_get_group_id, threadgroup_position_in_grid)
- * L threads (get_local_id, threadIdx, __ockl_get_local_id, thread_position_in_threadgroup)
- *
- *            NVIDIA                          AMD
- * G cores    SM (streaming multiprocessors)  CU (compute units)
- * L threads  CUDA cores                      stream processor
- *
- * GPU have warps which are grouped threads (32 each)
- * GPU are multicore processors with 32 threads
- *
- * SIMT (Single Instruction multiple threads) 
- *   - similar to SIMD but its not declared explicitly (float* instead of float<32>) as in SIMD
- *     this is important as in 
- *       `int i = get_local_id(0);`
- *     the register for i is a vectorial
- *
- *   - load/stores on the GPU are different compared to SIMD
- *    they are implicit scatter gather, where as on SIMD it is explicit
- *       meaning the GPU is moving or organizing data between different locations (scatter) and collecting it back together (gather) but without the user explicitly managing it 
- *       
- *       `Memory coalescing` is how GPUs achieve an efficient form of implicit scatter-gather
- *
- * ----------------------------------------------------------------------------
- * NVIDIA AD102
- * 144 SMs with 128 threads each -> 144 * 128 = 18432 CUDA cores (threads)
- *
- *
-**/
-
 #include <CL/cl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +38,8 @@ int main() {
   // KERNEL EXECUTION
   size_t globalSize = 128; // total number of threads (G*L)
   size_t localSize  = 32;  // threads per work-group (warp) (32 is max)
+  //
+  cl_event kernel_event;
   /*
    * clEnqueueNDRangeKernel
    * ----------------------
@@ -85,6 +54,16 @@ int main() {
    * cl_event *       event) CL_API_SUFFIX__VERSION_1_0;
   */
   clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &globalSize, &localSize, 0, NULL, NULL);
+  // Ensure the kernel finishes before measuring
+  clWaitForEvents(1, &kernel_event);
+
+  // MEASURE KERNEL RUNTIME
+  cl_ulong time_start, time_end;
+  clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
+  clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
+
+  double kernel_runtime_ms = (time_end - time_start) * 1e-6; // ns → ms
+  printf("Runtime: %.3f ms\n", kernel_runtime_ms);
   // READ RESULT
   clEnqueueReadBuffer(queue, bufC, CL_TRUE, 0, SIZE * sizeof(float), C, 0, NULL, NULL);
   // PRINT RESULT
